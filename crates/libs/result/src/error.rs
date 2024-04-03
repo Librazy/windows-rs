@@ -18,6 +18,7 @@ impl Error {
 
     /// Creates a new error object, capturing the stack and other information about the
     /// point of failure.
+    #[cfg(not(target_vendor = "win7"))]
     pub fn new<T: AsRef<str>>(code: HRESULT, message: T) -> Self {
         let message: Vec<_> = message.as_ref().encode_utf16().collect();
 
@@ -26,6 +27,30 @@ impl Error {
         } else {
             unsafe {
                 RoOriginateErrorW(code.0, message.len() as u32, message.as_ptr());
+            }
+            code.into()
+        }
+    }
+
+    /// Creates a new error object, capturing the stack and other information about the
+    /// point of failure.
+    #[cfg(target_vendor = "win7")]
+    pub fn new<T: AsRef<str>>(code: HRESULT, message: T) -> Self {
+        let message: Vec<_> = message.as_ref().encode_utf16().collect();
+
+        if message.is_empty() {
+            Self::from_hresult(code)
+        } else {
+            unsafe {
+                type RoOriginateError =
+                    extern "system" fn(code: HRESULT, message: *mut std::ffi::c_void) -> i32;
+
+                if let Some(function) = crate::delay_load::delay_load::<RoOriginateError>(
+                    ::std::concat!("combase.dll", '\0').as_ptr(),
+                    ::std::concat!("RoOriginateError", '\0').as_ptr(),
+                ) {
+                    function(code, std::mem::transmute_copy(&message));
+                }
             }
             code.into()
         }

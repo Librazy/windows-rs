@@ -22,5 +22,8 @@ pub use error::Error;
 mod hresult;
 pub use hresult::HRESULT;
 
+#[cfg(target_vendor = "win7")]
+mod delay_load;
+
 /// A specialized [`Result`] type that provides Windows error information.
 pub type Result<T> = std::result::Result<T, Error>;
